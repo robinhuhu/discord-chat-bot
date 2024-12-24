@@ -1,5 +1,5 @@
 # discord-chat-bot
-# Discord-Chat-Bot
+
 
 一个多功能的 Discord 机器人，可以根据选择的模式定时发送随机名言、重发频道中的消息，并支持语言翻译，提供个性化的用户体验。
 
