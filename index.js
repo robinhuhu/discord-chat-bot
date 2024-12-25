@@ -5,8 +5,8 @@ const fs = require('fs');
 const readlineSync = require('readline-sync');
 const translate = require('translate-google');
 
+// 日志记录函数，用于记录发送、删除、模式变化和错误事件
 function logEvent(type, messageId, content = '') {
-  
   const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false });
   const separator = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'; 
 
@@ -54,7 +54,7 @@ function logEvent(type, messageId, content = '') {
   }
 }
 
-
+// 检查是否使用上次的设置
 function shouldUsePreviousSettings() {
   const envFileExists = fs.existsSync('.env');
 
@@ -80,7 +80,6 @@ function shouldUsePreviousSettings() {
 
 const usePreviousSettings = shouldUsePreviousSettings();
 
-
 let botToken = process.env.BOT_TOKEN;
 let channelId = process.env.CHANNEL_ID;
 let mode = process.env.MODE || 'quote';
@@ -88,9 +87,9 @@ let delay = parseInt(process.env.DELAY) || 60000;
 let delAfter = parseInt(process.env.DEL_AFTER) || '';
 let repostLastChat = parseInt(process.env.REPOST_LAST_CHAT) || 10;
 let translateTo = process.env.TRANSLATE_TO || 'en';
+let proxyUrl = process.env.PROXY_URL;  // 新增的代理服务器 URL 配置
 
 const quoteEN = require('./quotes-en.json');
-
 
 if (!usePreviousSettings) {
   botToken = readlineSync.question('请输入你的 Discord 机器人令牌: ', { defaultInput: botToken });
@@ -122,20 +121,23 @@ if (!usePreviousSettings) {
   }
 
   translateTo = readlineSync.question('请输入翻译语言代码（参考 LANGUAGE.md）或留空以使用英语（en）: ', { defaultInput: translateTo });
+  proxyUrl = readlineSync.question('请输入代理服务器 URL（若不使用请留空）: ', { defaultInput: proxyUrl });
 
-  const envData = `BOT_TOKEN=${botToken}\nCHANNEL_ID=${channelId}\nMODE=${mode}\nDELAY=${delay}\nDEL_AFTER=${delAfter}\nREPOST_LAST_CHAT=${repostLastChat}\nTRANSLATE_TO=${translateTo}`;
+  const envData = `BOT_TOKEN=${botToken}\nCHANNEL_ID=${channelId}\nMODE=${mode}\nDELAY=${delay}\nDEL_AFTER=${delAfter}\nREPOST_LAST_CHAT=${repostLastChat}\nTRANSLATE_TO=${translateTo}\nPROXY_URL=${proxyUrl}`;
   fs.writeFileSync('.env', envData);
 }
 
 let bot;
 
 try {
-  bot = new Discord(botToken);
+  // 初始化 Discord 机器人实例，传递代理服务器配置（如果有）
+  bot = new Discord(botToken, proxyUrl ? { proxy: proxyUrl } : {});
 } catch (error) {
   logEvent('error', '', `初始化 Discord 机器人时出错: ${error.message}`);
   process.exit(1);
 }
 
+// 获取随机名言并翻译
 async function getRandomQuote() {
   const randomIndex = Math.floor(Math.random() * quoteEN.length);
   const textToTranslate = quoteEN[randomIndex].text;
@@ -151,7 +153,7 @@ async function getRandomQuote() {
   return textToTranslate;
 }
 
-
+// 处理消息发送
 function processMessage(_, contentCallback) {
   bot.getMessagesInChannel(channelId, 1).then((messageData) => {
     const hasMessages = messageData && messageData.length > 0;
@@ -176,6 +178,6 @@ function processMessage(_, contentCallback) {
   });
 }
 
-
+// 记录当前模式并启动定时发送消息的任务
 logEvent('mode', '', mode);
 setInterval(() => processMessage(null, getRandomQuote), delay);
